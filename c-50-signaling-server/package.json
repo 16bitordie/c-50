@@ -1,0 +1,20 @@
+{
+  "name": "c-50-signaling-server",
+  "version": "1.0.0",
+  "description": "Servidor de señalización WebRTC para el proyecto C-50",
+  "main": "src/server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "nodemon src/server.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "socket.io": "^4.7.5"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.0"
+  }
+}
