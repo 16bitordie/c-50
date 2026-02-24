@@ -12,7 +12,7 @@ av==16.1.0
 
 # Control de Hardware (Motores/Servos)
 gpiozero==2.0
-RPi.GPIO==1.9.0
+RPi.GPIO==0.7.1
 
 # Variables de entorno
 python-dotenv==1.0.0
