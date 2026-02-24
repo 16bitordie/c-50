@@ -26,10 +26,9 @@ def create_video_track():
             print("[Video] Detectado Linux (Raspberry Pi). Abriendo /dev/video0...")
             
             # Opciones optimizadas para Raspberry Pi y v4l2
+            # Eliminamos pixel_format y framerate para que ffmpeg auto-negocie
             options = {
-                'video_size': config.VIDEO_RESOLUTION,
-                'framerate': str(config.VIDEO_FRAMERATE),
-                'pixel_format': 'yuyv422' # Formato muy común en cámaras USB/CSI
+                'video_size': config.VIDEO_RESOLUTION
             }
             
             player = MediaPlayer('/dev/video0', format='v4l2', options=options)
