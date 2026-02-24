@@ -23,34 +23,25 @@ def create_video_track():
             
         elif os_name == "Linux":
             # En Raspberry Pi OS Bookworm con cámara CSI, v4l2 no funciona directamente.
-            # La forma más robusta de integrar libcamera con aiortc es usar un pipeline de GStreamer
-            print("[Video] Detectado Linux (Raspberry Pi Bookworm). Usando pipeline de GStreamer...")
+            print("[Video] Detectado Linux (Raspberry Pi Bookworm).")
             
-            # Construimos un pipeline de GStreamer que usa libcamerasrc
-            # y lo convierte a un formato que aiortc (ffmpeg) pueda entender.
-            pipeline = (
-                f"libcamerasrc ! "
-                f"video/x-raw,width={config.VIDEO_RESOLUTION.split('x')[0]},height={config.VIDEO_RESOLUTION.split('x')[1]},framerate={config.VIDEO_FRAMERATE}/1 ! "
-                f"videoconvert ! appsink"
-            )
-            
-            # aiortc no soporta GStreamer pipelines directamente en MediaPlayer.
-            # La alternativa real en Bookworm para aiortc es usar el wrapper libcamerify
-            # o forzar el formato de pixel a algo muy básico en /dev/video0.
+            # La solución definitiva para Bookworm sin libcamerify es usar el dispositivo
+            # de video que libcamera expone para compatibilidad v4l2.
+            # Según v4l2-ctl --list-devices, la cámara está en /dev/video0
             
             # Vamos a intentar la opción más compatible para /dev/video0 en Bookworm:
-            # Forzar el formato a YUV420P que es el más universal para ffmpeg
+            # Forzar el formato a YUYV422 que es el que vimos que soporta nativamente
             options = {
                 'video_size': config.VIDEO_RESOLUTION,
                 'framerate': str(config.VIDEO_FRAMERATE),
-                'pixel_format': 'yuv420p'
+                'pixel_format': 'yuyv422'
             }
             
             try:
-                print("[Video] Intentando abrir /dev/video0 con formato yuv420p...")
+                print("[Video] Intentando abrir /dev/video0 con formato yuyv422...")
                 player = MediaPlayer('/dev/video0', format='v4l2', options=options)
             except Exception as e:
-                print(f"[Video] Falló /dev/video0 con yuv420p: {e}")
+                print(f"[Video] Falló /dev/video0 con yuyv422: {e}")
                 print("[Video] Intentando abrir /dev/video0 sin opciones estrictas...")
                 player = MediaPlayer('/dev/video0', format='v4l2')
             
