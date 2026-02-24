@@ -26,12 +26,22 @@ def create_video_track():
             print("[Video] Detectado Linux (Raspberry Pi). Abriendo /dev/video0...")
             
             # Opciones optimizadas para Raspberry Pi y v4l2
-            # Eliminamos pixel_format y framerate para que ffmpeg auto-negocie
+            # Usamos libcamera o v4l2 dependiendo del driver de la cámara
             options = {
-                'video_size': config.VIDEO_RESOLUTION
+                'video_size': config.VIDEO_RESOLUTION,
+                'pixel_format': 'yuyv422'
             }
             
-            player = MediaPlayer('/dev/video0', format='v4l2', options=options)
+            # En las nuevas Raspberry Pi OS (Bookworm), libcamera es el estándar.
+            # Si v4l2 falla, a veces es mejor usar el comando libcamera-vid o libcamerasrc
+            # Pero para aiortc, v4l2 suele ser la única opción directa.
+            
+            # Intento 1: v4l2 estándar
+            try:
+                player = MediaPlayer('/dev/video0', format='v4l2', options=options)
+            except Exception as e:
+                print(f"[Video] Falló v4l2 estándar: {e}. Intentando sin opciones...")
+                player = MediaPlayer('/dev/video0', format='v4l2')
             
         else:
             print(f"[Video] SO no soportado para captura directa: {os_name}")
