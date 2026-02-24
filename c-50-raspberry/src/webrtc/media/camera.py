@@ -23,18 +23,29 @@ def create_video_track():
             
         elif os_name == "Linux":
             # En Raspberry Pi OS Bookworm con cámara CSI, v4l2 no funciona directamente.
-            # Usamos un comando de consola (libcamera-vid) y lo pasamos a aiortc.
-            print("[Video] Detectado Linux (Raspberry Pi Bookworm). Usando libcamera-vid...")
+            # Usamos libcamerasrc a través de GStreamer (que ffmpeg/aiortc puede leer)
+            print("[Video] Detectado Linux (Raspberry Pi Bookworm). Usando libcamerasrc...")
             
-            # libcamera-vid captura el video, lo codifica en h264 y lo envía por stdout (-)
-            # aiortc (ffmpeg) lee ese stdout como si fuera un archivo.
-            cmd = (
-                f"libcamera-vid -t 0 --inline --width {config.VIDEO_RESOLUTION.split('x')[0]} "
-                f"--height {config.VIDEO_RESOLUTION.split('x')[1]} --framerate {config.VIDEO_FRAMERATE} "
-                f"--codec h264 -o -"
-            )
+            # En lugar de ejecutar un comando de consola (que aiortc interpreta como archivo),
+            # le decimos a aiortc que use el dispositivo virtual de libcamera si existe,
+            # o que use un pipeline de GStreamer.
+            # Para aiortc, la forma más limpia en Bookworm es usar el wrapper v4l2 de libcamera
+            # que se activa precargando una librería, pero desde Python es complejo.
             
-            player = MediaPlayer(cmd, format='h264', options={})
+            # Vamos a intentar usar el dispositivo de video que libcamera expone (suele ser video0 o video1)
+            # pero forzando el formato a h264 o mjpeg que son más compatibles.
+            options = {
+                'video_size': config.VIDEO_RESOLUTION,
+                'framerate': str(config.VIDEO_FRAMERATE)
+            }
+            
+            # Intentamos abrir /dev/video0 (que libcamera a veces emula)
+            # Si falla, intentamos con /dev/video11 (que a veces es el nodo de hardware en Bookworm)
+            try:
+                player = MediaPlayer('/dev/video0', format='v4l2', options=options)
+            except Exception as e:
+                print(f"[Video] Falló /dev/video0: {e}. Intentando /dev/video11...")
+                player = MediaPlayer('/dev/video11', format='v4l2', options=options)
             
         else:
             print(f"[Video] SO no soportado para captura directa: {os_name}")
