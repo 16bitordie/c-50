@@ -11,6 +11,10 @@ class OpenCVVideoTrack(VideoStreamTrack):
     los frames de la cámara. Esto soluciona los problemas de compatibilidad
     de ffmpeg/v4l2 con libcamera en Raspberry Pi OS Bookworm.
     """
+    
+    # aiortc necesita saber qué tipo de track es este
+    kind = "video"
+    
     def __init__(self, camera_index=0):
         super().__init__()  # No olvides llamar al constructor padre
         self.camera_index = camera_index
