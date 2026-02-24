@@ -7,6 +7,7 @@ python-socketio==5.16.1
 websocket-client==1.9.0
 
 # Procesamiento de imagen/video (opcional, pero recomendado para aiortc)
+numpy<2.0.0
 opencv-python-headless==4.8.0.76
 av==16.1.0
 
