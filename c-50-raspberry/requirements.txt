@@ -12,7 +12,7 @@ av==16.1.0
 
 # Control de Hardware (Motores/Servos)
 gpiozero==2.0
-RPi.GPIO==0.7.1
+# RPi.GPIO==0.7.1 (Comentado temporalmente, se instalará vía apt en la Raspberry)
 
 # Variables de entorno
 python-dotenv==1.0.0
