@@ -24,10 +24,15 @@ def create_video_track():
         elif os_name == "Linux":
             # En Raspberry Pi (Linux), usamos Video4Linux2 (v4l2)
             print("[Video] Detectado Linux (Raspberry Pi). Abriendo /dev/video0...")
-            player = MediaPlayer('/dev/video0', format='v4l2', options={
+            
+            # Opciones optimizadas para Raspberry Pi y v4l2
+            options = {
                 'video_size': config.VIDEO_RESOLUTION,
-                'framerate': str(config.VIDEO_FRAMERATE)
-            })
+                'framerate': str(config.VIDEO_FRAMERATE),
+                'pixel_format': 'yuyv422' # Formato muy común en cámaras USB/CSI
+            }
+            
+            player = MediaPlayer('/dev/video0', format='v4l2', options=options)
             
         else:
             print(f"[Video] SO no soportado para captura directa: {os_name}")
