@@ -1,0 +1,18 @@
+# Dependencias para el cerebro de C-50 (Raspberry Pi)
+
+# WebRTC y asincronía
+aiortc==0.9.28
+aiohttp==3.8.5
+python-socketio==5.9.0
+websocket-client==1.6.1
+
+# Procesamiento de imagen/video (opcional, pero recomendado para aiortc)
+opencv-python-headless==4.8.0.76
+av==11.0.0
+
+# Control de Hardware (Motores/Servos)
+gpiozero==2.0
+RPi.GPIO==1.9.0
+
+# Variables de entorno
+python-dotenv==1.0.0

@@ -1,0 +1,14 @@
+{
+  "name": "c-50-signaling-test",
+  "version": "1.0.0",
+  "description": "Scripts de prueba para el servidor de señalización de C-50",
+  "main": "test-client.js",
+  "type": "module",
+  "scripts": {
+    "test:client1": "node test-client.js client1",
+    "test:client2": "node test-client.js client2"
+  },
+  "dependencies": {
+    "socket.io-client": "^4.7.5"
+  }
+}
