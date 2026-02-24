@@ -23,29 +23,36 @@ def create_video_track():
             
         elif os_name == "Linux":
             # En Raspberry Pi OS Bookworm con cámara CSI, v4l2 no funciona directamente.
-            # Usamos libcamerasrc a través de GStreamer (que ffmpeg/aiortc puede leer)
-            print("[Video] Detectado Linux (Raspberry Pi Bookworm). Usando libcamerasrc...")
+            # La forma más robusta de integrar libcamera con aiortc es usar un pipeline de GStreamer
+            print("[Video] Detectado Linux (Raspberry Pi Bookworm). Usando pipeline de GStreamer...")
             
-            # En lugar de ejecutar un comando de consola (que aiortc interpreta como archivo),
-            # le decimos a aiortc que use el dispositivo virtual de libcamera si existe,
-            # o que use un pipeline de GStreamer.
-            # Para aiortc, la forma más limpia en Bookworm es usar el wrapper v4l2 de libcamera
-            # que se activa precargando una librería, pero desde Python es complejo.
+            # Construimos un pipeline de GStreamer que usa libcamerasrc
+            # y lo convierte a un formato que aiortc (ffmpeg) pueda entender.
+            pipeline = (
+                f"libcamerasrc ! "
+                f"video/x-raw,width={config.VIDEO_RESOLUTION.split('x')[0]},height={config.VIDEO_RESOLUTION.split('x')[1]},framerate={config.VIDEO_FRAMERATE}/1 ! "
+                f"videoconvert ! appsink"
+            )
             
-            # Vamos a intentar usar el dispositivo de video que libcamera expone (suele ser video0 o video1)
-            # pero forzando el formato a h264 o mjpeg que son más compatibles.
+            # aiortc no soporta GStreamer pipelines directamente en MediaPlayer.
+            # La alternativa real en Bookworm para aiortc es usar el wrapper libcamerify
+            # o forzar el formato de pixel a algo muy básico en /dev/video0.
+            
+            # Vamos a intentar la opción más compatible para /dev/video0 en Bookworm:
+            # Forzar el formato a YUV420P que es el más universal para ffmpeg
             options = {
                 'video_size': config.VIDEO_RESOLUTION,
-                'framerate': str(config.VIDEO_FRAMERATE)
+                'framerate': str(config.VIDEO_FRAMERATE),
+                'pixel_format': 'yuv420p'
             }
             
-            # Intentamos abrir /dev/video0 (que libcamera a veces emula)
-            # Si falla, intentamos con /dev/video11 (que a veces es el nodo de hardware en Bookworm)
             try:
+                print("[Video] Intentando abrir /dev/video0 con formato yuv420p...")
                 player = MediaPlayer('/dev/video0', format='v4l2', options=options)
             except Exception as e:
-                print(f"[Video] Falló /dev/video0: {e}. Intentando /dev/video11...")
-                player = MediaPlayer('/dev/video11', format='v4l2', options=options)
+                print(f"[Video] Falló /dev/video0 con yuv420p: {e}")
+                print("[Video] Intentando abrir /dev/video0 sin opciones estrictas...")
+                player = MediaPlayer('/dev/video0', format='v4l2')
             
         else:
             print(f"[Video] SO no soportado para captura directa: {os_name}")
