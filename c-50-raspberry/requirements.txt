@@ -8,7 +8,7 @@ websocket-client==1.9.0
 
 # Procesamiento de imagen/video (opcional, pero recomendado para aiortc)
 numpy<2.0.0
-av==10.0.0
+# av==10.0.0  <-- COMENTADO: Lo instalaremos vía apt-get para evitar compilarlo
 
 # Control de Hardware (Motores/Servos)
 gpiozero==2.0
