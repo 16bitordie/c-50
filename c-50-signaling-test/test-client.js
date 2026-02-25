@@ -36,9 +36,29 @@ socket.on('connect', () => {
   if (clientName === 'client1') {
     setTimeout(() => {
       console.log(`\n📤 [${clientName}] Enviando oferta WebRTC simulada...`);
+      
+      // IMPORTANTE: Para que aiortc no falle con "None is not in list",
+      // la oferta simulada debe indicar explícitamente que quiere enviar/recibir video.
+      // Este es un SDP mínimo válido que incluye una línea de media (m=video)
+      // y las credenciales ICE obligatorias (ice-ufrag y ice-pwd).
+      const fakeSdp = `v=0\r
+o=- 123456 2 IN IP4 127.0.0.1\r
+s=-\r
+t=0 0\r
+a=ice-ufrag:fakeufrag12345678\r
+a=ice-pwd:fakepassword12345678901234567890\r
+a=fingerprint:sha-256 00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00\r
+a=setup:actpass\r
+m=video 9 UDP/TLS/RTP/SAVPF 96\r
+c=IN IP4 0.0.0.0\r
+a=sendrecv\r
+a=rtcp-mux\r
+a=rtpmap:96 VP8/90000\r
+`;
+
       socket.emit('offer', {
         roomId: ROOM_ID,
-        offer: { type: 'offer', sdp: 'v=0\r\no=- 123456 2 IN IP4 127.0.0.1\r\n...' }
+        offer: { type: 'offer', sdp: fakeSdp }
       });
     }, 2000);
   }
