@@ -1,6 +1,6 @@
 ﻿import asyncio
 import socketio
-from aiortc import RTCPeerConnection, RTCSessionDescription, RTCIceCandidate
+from aiortc import RTCPeerConnection, RTCSessionDescription, RTCIceCandidate, RTCConfiguration, RTCIceServer
 from src.config import config
 from src.webrtc.media.camera import create_video_track
 
@@ -15,10 +15,17 @@ ice_candidates_buffer = []
 async def setup_webrtc():
     """Configura la conexión WebRTC (PeerConnection)."""
     global pc
+
+    # Configurar servidores STUN (¡Vital para salir de la red local!)
+    config = RTCConfiguration(
+        iceServers=[
+            RTCIceServer(urls=["stun:stun.l.google.com:19302"])
+        ]
+    )
     
-    # Crear la conexión P2P
-    pc = RTCPeerConnection()
-    print("[WebRTC] PeerConnection creada.")
+    # Crear la conexión P2P con el servidor STUN añadido
+    pc = RTCPeerConnection(configuration=config)
+    print("[WebRTC] PeerConnection creada con servidor STUN.")
 
     # Añadir el track de video de la cámara a la conexión
     video_track = create_video_track()
