@@ -1,6 +1,7 @@
 ﻿import asyncio
 import socketio
 from aiortc import RTCPeerConnection, RTCSessionDescription, RTCIceCandidate, RTCConfiguration, RTCIceServer
+from aiortc.sdp import candidate_from_sdp
 from src.config import config
 from src.webrtc.media.camera import create_video_track
 
@@ -114,15 +115,16 @@ async def on_ice_candidate(data):
         m_id = cand_data.get('sdpMid') or cand_data.get('id')
         m_index = cand_data.get('sdpMLineIndex')
         if m_index is None: m_index = cand_data.get('label', 0)
-             
-        candidate = RTCIceCandidate(
-            component=m_index, foundation=0, ip="0.0.0.0", port=0, priority=0,
-            protocol="udp", type="host", sdpMid=m_id
-        )
+        
+        # Parsear el candidato real desde el string SDP que envía Android
+        candidate_str = cand_data.get('candidate')
+        if not candidate_str:
+            return
+            
+        candidate = candidate_from_sdp(candidate_str)
         candidate.sdpMid = m_id
         candidate.sdpMLineIndex = m_index
-        if hasattr(candidate, 'candidate'): candidate.candidate = cand_data.get('candidate')
-        
+
         # Si no hemos enviado Answer aún, lo guardamos para luego
         if pc is None or pc.localDescription is None:
             ice_candidates_buffer.append(candidate)
