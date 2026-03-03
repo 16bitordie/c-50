@@ -10,6 +10,7 @@ sio = socketio.AsyncClient()
 # Variables globales para WebRTC
 pc = None
 data_channel = None
+ice_candidates_buffer = []
 
 async def setup_webrtc():
     """Configura la conexión WebRTC (PeerConnection)."""
@@ -66,64 +67,63 @@ async def on_offer(data):
     """Recibe una oferta de la App Android y responde."""
     print(f"\n[Signaling] Oferta recibida de: {data['senderId']}")
     
+    global pc, ice_candidates_buffer
+    ice_candidates_buffer = []  # Limpia el buffer
+    
     if pc is None:
         await setup_webrtc()
 
-    # Aplicar la oferta remota
     offer = RTCSessionDescription(sdp=data['offer']['sdp'], type=data['offer']['type'])
     await pc.setRemoteDescription(offer)
     print("[WebRTC] Remote Description (Offer) aplicada.")
 
-    # Crear la respuesta
     answer = await pc.createAnswer()
     await pc.setLocalDescription(answer)
     print("[WebRTC] Local Description (Answer) creada.")
 
-    # Enviar la respuesta de vuelta a la App Android
     await sio.emit('answer', {
         'roomId': config.ROOM_ID,
         'answer': {'type': pc.localDescription.type, 'sdp': pc.localDescription.sdp}
     })
     print("[Signaling] Respuesta enviada.")
 
+    # AHORA que ya tenemos Answer, inyectamos todos los ICE acumulados
+    for cand in ice_candidates_buffer:
+        try:
+            await pc.addIceCandidate(cand)
+            print("[WebRTC] Candidato ICE buffer inyectado.")
+        except:
+            pass
+    ice_candidates_buffer = [] # Vaciamos
+
 @sio.on('ice-candidate')
 async def on_ice_candidate(data):
-    """Recibe candidatos ICE de la App Android."""
-    print(f"[Signaling] Candidato ICE recibido de: {data['senderId']}")
-
-    global pc
-    if pc is not None:
-        try:
-            cand_data = data['candidate']
-            
-            # Extraemos los datos usando las claves de Android ('id' y 'label') o las estandar ('sdpMid')
-            m_id = cand_data.get('sdpMid') or cand_data.get('id')
-            m_index = cand_data.get('sdpMLineIndex')
-            if m_index is None:
-                 m_index = cand_data.get('label', 0)
-                 
-            candidate = RTCIceCandidate(
-                component=m_index,
-                foundation=0,
-                ip="0.0.0.0", 
-                port=0,
-                priority=0,
-                protocol="udp",
-                type="host",
-                sdpMid=m_id
-            )
-            candidate.sdpMid = m_id
-            candidate.sdpMLineIndex = m_index
-            if hasattr(candidate, 'candidate'):
-                candidate.candidate = cand_data.get('candidate')
-            
-            try:
-                await pc.addIceCandidate(candidate)
-                print("[WebRTC] Candidato ICE inyectado en Pi.")
-            except AttributeError:
-                pass
-        except Exception as e:
-            print(f"[WebRTC] Error inyectando ICE: {e}")
+    """Recibe candidatos ICE de la App Android y los procesa."""
+    global pc, ice_candidates_buffer
+    
+    try:
+        cand_data = data['candidate']
+        m_id = cand_data.get('sdpMid') or cand_data.get('id')
+        m_index = cand_data.get('sdpMLineIndex')
+        if m_index is None: m_index = cand_data.get('label', 0)
+             
+        candidate = RTCIceCandidate(
+            component=m_index, foundation=0, ip="0.0.0.0", port=0, priority=0,
+            protocol="udp", type="host", sdpMid=m_id
+        )
+        candidate.sdpMid = m_id
+        candidate.sdpMLineIndex = m_index
+        if hasattr(candidate, 'candidate'): candidate.candidate = cand_data.get('candidate')
+        
+        # Si no hemos enviado Answer aún, lo guardamos para luego
+        if pc is None or pc.localDescription is None:
+            ice_candidates_buffer.append(candidate)
+            print("[WebRTC] ICE encolado (esperando Answer).")
+        else:
+            await pc.addIceCandidate(candidate)
+            print("[WebRTC] Candidato ICE inyectado directo.")
+    except Exception as e:
+        print(f"[WebRTC] Error con ICE: {e}")
 
 async def start_signaling():
     """Inicia la conexión con el servidor de señalización."""
