@@ -88,6 +88,7 @@ async def on_offer(data):
     await pc.setLocalDescription(answer)
     print("[WebRTC] Local Description (Answer) creada.")
 
+    print(f"[Debug] Enviando Answer al Room ID: {config.ROOM_ID}")
     await sio.emit('answer', {
         'roomId': config.ROOM_ID,
         'answer': {'type': pc.localDescription.type, 'sdp': pc.localDescription.sdp}
