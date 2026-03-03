@@ -12,29 +12,29 @@ pc = None
 data_channel = None
 
 async def setup_webrtc():
-    """Configura la conexiÃ³n WebRTC (PeerConnection)."""
+    """Configura la conexión WebRTC (PeerConnection)."""
     global pc
     
-    # Crear la conexiÃ³n P2P
+    # Crear la conexión P2P
     pc = RTCPeerConnection()
     print("[WebRTC] PeerConnection creada.")
 
-    # AÃ±adir el track de video de la cÃ¡mara a la conexiÃ³n
+    # Añadir el track de video de la cámara a la conexión
     video_track = create_video_track()
     if video_track:
         pc.addTrack(video_track)
-        print("[WebRTC] Track de video aÃ±adido a la conexiÃ³n.")
+        print("[WebRTC] Track de video añadido a la conexión.")
     else:
-        print("[WebRTC] Advertencia: No se pudo aÃ±adir el track de video.")
+        print("[WebRTC] Advertencia: No se pudo añadir el track de video.")
 
-    # Manejar el estado de la conexiÃ³n
+    # Manejar el estado de la conexión
     @pc.on("connectionstatechange")
     async def on_connectionstatechange():
-        print(f"[WebRTC] Estado de conexiÃ³n: {pc.connectionState}")
+        print(f"[WebRTC] Estado de conexión: {pc.connectionState}")
         if pc.connectionState == "failed":
             await pc.close()
 
-    # Manejar la recepciÃ³n de Data Channels (desde la App Android)
+    # Manejar la recepción de Data Channels (desde la App Android)
     @pc.on("datachannel")
     def on_datachannel(channel):
         global data_channel
@@ -44,11 +44,11 @@ async def setup_webrtc():
         @channel.on("message")
         def on_message(message):
             print(f"[DataChannel] Mensaje recibido: {message}")
-            # AquÃ­ conectaremos con el control de motores mÃ¡s adelante
+            # Aquí conectaremos con el control de motores más adelante
             # ej: if message == "ADELANTE": mover_motores()
 
 # ============================================================================
-# EVENTOS DE SOCKET.IO (SEÃ‘ALIZACIÃ“N)
+# EVENTOS DE SOCKET.IO (SEÑALIZACIÓN)
 # ============================================================================
 
 @sio.event
@@ -90,21 +90,41 @@ async def on_offer(data):
 async def on_ice_candidate(data):
     """Recibe candidatos ICE de la App Android."""
     print(f"[Signaling] Candidato ICE recibido de: {data['senderId']}")
-    
+
+    global pc
     if pc is not None:
-        # aiortc maneja los candidatos ICE internamente en la mayorÃ­a de los casos,
-        # pero si necesitas aÃ±adirlos manualmente, se harÃ­a aquÃ­.
-        # candidate = RTCIceCandidate(...)
-        # await pc.addIceCandidate(candidate)
-        pass
+        try:
+            cand_data = data['candidate']
+            candidate = RTCIceCandidate(
+                component=cand_data.get('sdpMLineIndex', 0),
+                foundation=0,
+                ip="0.0.0.0", 
+                port=0,
+                priority=0,
+                protocol="udp",
+                type="host",
+                sdpMid=cand_data.get('sdpMid')
+            )
+            candidate.sdpMid = cand_data.get('sdpMid')
+            candidate.sdpMLineIndex = cand_data.get('sdpMLineIndex')
+            if hasattr(candidate, 'candidate'):
+                candidate.candidate = cand_data.get('candidate')
+            
+            try:
+                await pc.addIceCandidate(candidate)
+                print("[WebRTC] Candidato ICE inyectado en Pi.")
+            except AttributeError:
+                print("[WebRTC] Ignorando inyección en esta API.")
+        except Exception as e:
+            print(f"[WebRTC] Error inyectando ICE: {e}")
 
 async def start_signaling():
-    """Inicia la conexiÃ³n con el servidor de seÃ±alizaciÃ³n."""
+    """Inicia la conexión con el servidor de señalización."""
     try:
         await sio.connect(config.SIGNALING_SERVER_URL)
         await sio.wait()
     except Exception as e:
-        print(f"[Error] No se pudo conectar al servidor de seÃ±alizaciÃ³n: {e}")
+        print(f"[Error] No se pudo conectar al servidor de señalización: {e}")
 
 if __name__ == "__main__":
     # Para probar este archivo de forma independiente
