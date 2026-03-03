@@ -1,4 +1,4 @@
-import asyncio
+﻿import asyncio
 import socketio
 from aiortc import RTCPeerConnection, RTCSessionDescription, RTCIceCandidate
 from src.config import config
@@ -12,29 +12,29 @@ pc = None
 data_channel = None
 
 async def setup_webrtc():
-    """Configura la conexión WebRTC (PeerConnection)."""
+    """Configura la conexiÃ³n WebRTC (PeerConnection)."""
     global pc
     
-    # Crear la conexión P2P
+    # Crear la conexiÃ³n P2P
     pc = RTCPeerConnection()
     print("[WebRTC] PeerConnection creada.")
 
-    # Añadir el track de video de la cámara a la conexión
+    # AÃ±adir el track de video de la cÃ¡mara a la conexiÃ³n
     video_track = create_video_track()
     if video_track:
         pc.addTrack(video_track)
-        print("[WebRTC] Track de video añadido a la conexión.")
+        print("[WebRTC] Track de video aÃ±adido a la conexiÃ³n.")
     else:
-        print("[WebRTC] Advertencia: No se pudo añadir el track de video.")
+        print("[WebRTC] Advertencia: No se pudo aÃ±adir el track de video.")
 
-    # Manejar el estado de la conexión
+    # Manejar el estado de la conexiÃ³n
     @pc.on("connectionstatechange")
     async def on_connectionstatechange():
-        print(f"[WebRTC] Estado de conexión: {pc.connectionState}")
+        print(f"[WebRTC] Estado de conexiÃ³n: {pc.connectionState}")
         if pc.connectionState == "failed":
             await pc.close()
 
-    # Manejar la recepción de Data Channels (desde la App Android)
+    # Manejar la recepciÃ³n de Data Channels (desde la App Android)
     @pc.on("datachannel")
     def on_datachannel(channel):
         global data_channel
@@ -44,11 +44,11 @@ async def setup_webrtc():
         @channel.on("message")
         def on_message(message):
             print(f"[DataChannel] Mensaje recibido: {message}")
-            # Aquí conectaremos con el control de motores más adelante
+            # AquÃ­ conectaremos con el control de motores mÃ¡s adelante
             # ej: if message == "ADELANTE": mover_motores()
 
 # ============================================================================
-# EVENTOS DE SOCKET.IO (SEÑALIZACIÓN)
+# EVENTOS DE SOCKET.IO (SEÃ‘ALIZACIÃ“N)
 # ============================================================================
 
 @sio.event
@@ -92,19 +92,19 @@ async def on_ice_candidate(data):
     print(f"[Signaling] Candidato ICE recibido de: {data['senderId']}")
     
     if pc is not None:
-        # aiortc maneja los candidatos ICE internamente en la mayoría de los casos,
-        # pero si necesitas añadirlos manualmente, se haría aquí.
+        # aiortc maneja los candidatos ICE internamente en la mayorÃ­a de los casos,
+        # pero si necesitas aÃ±adirlos manualmente, se harÃ­a aquÃ­.
         # candidate = RTCIceCandidate(...)
         # await pc.addIceCandidate(candidate)
         pass
 
 async def start_signaling():
-    """Inicia la conexión con el servidor de señalización."""
+    """Inicia la conexiÃ³n con el servidor de seÃ±alizaciÃ³n."""
     try:
         await sio.connect(config.SIGNALING_SERVER_URL)
         await sio.wait()
     except Exception as e:
-        print(f"[Error] No se pudo conectar al servidor de señalización: {e}")
+        print(f"[Error] No se pudo conectar al servidor de seÃ±alizaciÃ³n: {e}")
 
 if __name__ == "__main__":
     # Para probar este archivo de forma independiente
