@@ -95,18 +95,25 @@ async def on_ice_candidate(data):
     if pc is not None:
         try:
             cand_data = data['candidate']
+            
+            # Extraemos los datos usando las claves de Android ('id' y 'label') o las estandar ('sdpMid')
+            m_id = cand_data.get('sdpMid') or cand_data.get('id')
+            m_index = cand_data.get('sdpMLineIndex')
+            if m_index is None:
+                 m_index = cand_data.get('label', 0)
+                 
             candidate = RTCIceCandidate(
-                component=cand_data.get('sdpMLineIndex', 0),
+                component=m_index,
                 foundation=0,
                 ip="0.0.0.0", 
                 port=0,
                 priority=0,
                 protocol="udp",
                 type="host",
-                sdpMid=cand_data.get('sdpMid')
+                sdpMid=m_id
             )
-            candidate.sdpMid = cand_data.get('sdpMid')
-            candidate.sdpMLineIndex = cand_data.get('sdpMLineIndex')
+            candidate.sdpMid = m_id
+            candidate.sdpMLineIndex = m_index
             if hasattr(candidate, 'candidate'):
                 candidate.candidate = cand_data.get('candidate')
             
@@ -114,7 +121,7 @@ async def on_ice_candidate(data):
                 await pc.addIceCandidate(candidate)
                 print("[WebRTC] Candidato ICE inyectado en Pi.")
             except AttributeError:
-                print("[WebRTC] Ignorando inyección en esta API.")
+                pass
         except Exception as e:
             print(f"[WebRTC] Error inyectando ICE: {e}")
 
