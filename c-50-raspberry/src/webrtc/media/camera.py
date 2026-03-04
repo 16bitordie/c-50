@@ -1,6 +1,34 @@
 import platform
+import asyncio
+from aiortc import VideoStreamTrack
 from aiortc.contrib.media import MediaPlayer
 from src.config import config
+
+class LowLatencyVideoTrack(VideoStreamTrack):
+    """
+    Wrapper de VideoStreamTrack que elimina el lag acumulativo.
+    Si el codificador de la Raspberry Pi va más lento que la cámara, 
+    los frames se acumulan en la cola provocando segundos de retraso.
+    Esta clase vacía la basura y entrega siempre el frame más reciente.
+    """
+    def __init__(self, track):
+        super().__init__()
+        self.kind = "video"
+        self.track = track
+
+    async def recv(self):
+        # Si track._queue existe, vamos a vaciar los frames atascados en el pasado
+        if hasattr(self.track, '_queue'):
+            # Mientras haya más de 1 frame de retraso esperando...
+            while self.track._queue.qsize() > 1:
+                try:
+                    # Sacamos el frame viejo y lo tiramos a la basura
+                    self.track._queue.get_nowait()
+                except asyncio.QueueEmpty:
+                    break
+        
+        # Devolvemos el único frame reciente de la cola
+        return await self.track.recv()
 
 def create_video_track():
     """
@@ -16,8 +44,8 @@ def create_video_track():
                 'video_size': config.VIDEO_RESOLUTION,
                 'framerate': str(config.VIDEO_FRAMERATE)
             })
-            return player.video
-            
+            return LowLatencyVideoTrack(player.video)
+
         elif os_name == "Linux":
             # En Raspberry Pi OS Bullseye (Legacy), v4l2 funciona nativamente
             # y es mucho más rápido que usar OpenCV.
@@ -33,8 +61,9 @@ def create_video_track():
             })
             
             print("[Video] Track de cámara (v4l2) creado correctamente.")
-            return player.video
-            
+            # Track encapsulado para tirar frames si la Pi no procesa a tiempo
+            return LowLatencyVideoTrack(player.video)
+
     except Exception as e:
         print(f"[Error Video] No se pudo inicializar la cámara: {e}")
         print("[Error Video] Asegúrate de tener una cámara conectada o permisos suficientes.")
