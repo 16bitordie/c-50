@@ -13,6 +13,18 @@ pc = None
 data_channel = None
 ice_candidates_buffer = []
 
+async def cleanup_webrtc():
+    """Limpia y cierra la conexión actual para permitir una nueva."""
+    global pc, data_channel, ice_candidates_buffer
+    if pc:
+        print("[WebRTC] Cerrando conexión P2P anterior...")
+        # aiortc cancela asíncronamente las tareas al cerrar
+        await pc.close()
+        pc = None
+    data_channel = None
+    ice_candidates_buffer = []
+    print("[WebRTC] Estado limpiado. Listo para nueva conexión.")
+
 async def setup_webrtc():
     """Configura la conexión WebRTC (PeerConnection)."""
     global pc
@@ -40,8 +52,8 @@ async def setup_webrtc():
     @pc.on("connectionstatechange")
     async def on_connectionstatechange():
         print(f"[WebRTC] Estado de conexión: {pc.connectionState}")
-        if pc.connectionState == "failed":
-            await pc.close()
+        if pc and pc.connectionState in ["failed", "closed"]:
+            await cleanup_webrtc()
 
     # Manejar la recepción de Data Channels (desde la App Android)
     @pc.on("datachannel")
@@ -74,12 +86,13 @@ async def disconnect():
 async def on_offer(data):
     """Recibe una oferta de la App Android y responde."""
     print(f"\n[Signaling] Oferta recibida de: {data['senderId']}")
-    
+
     global pc, ice_candidates_buffer
-    ice_candidates_buffer = []  # Limpia el buffer
     
-    if pc is None:
-        await setup_webrtc()
+    # Si entra una oferta nueva, forzamos la limpieza de cualquier sesión previa atascada
+    await cleanup_webrtc()
+
+    await setup_webrtc()
 
     offer = RTCSessionDescription(sdp=data['offer']['sdp'], type=data['offer']['type'])
     await pc.setRemoteDescription(offer)
