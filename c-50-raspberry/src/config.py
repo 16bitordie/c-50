@@ -13,7 +13,7 @@ class Config:
     
     # Video
     VIDEO_RESOLUTION = os.getenv("VIDEO_RESOLUTION", "640x480")
-    VIDEO_FRAMERATE = int(os.getenv("VIDEO_FRAMERATE", 60))
+    VIDEO_FRAMERATE = int(os.getenv("VIDEO_FRAMERATE", 30))
     
     # Hardware (Pines GPIO)
     MOTOR_LEFT_FORWARD = int(os.getenv("MOTOR_LEFT_FORWARD", 17))
