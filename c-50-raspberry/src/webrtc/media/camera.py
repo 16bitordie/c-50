@@ -30,6 +30,12 @@ class LowLatencyVideoTrack(VideoStreamTrack):
         # Devolvemos el único frame reciente de la cola
         return await self.track.recv()
 
+    def stop(self):
+        """Asegura que al cerrar la conexión WebRTC, se libere la cámara hardware."""
+        super().stop()
+        if self.track and hasattr(self.track, 'stop'):
+            self.track.stop()
+
 def create_video_track():
     """
     Crea y devuelve un track de video capturado desde la cámara.

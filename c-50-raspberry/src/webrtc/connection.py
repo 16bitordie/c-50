@@ -51,8 +51,10 @@ async def setup_webrtc():
     # Manejar el estado de la conexión
     @pc.on("connectionstatechange")
     async def on_connectionstatechange():
+        if pc is None:
+            return  # Si ya está limpio, ignoramos eventos retrasados
         print(f"[WebRTC] Estado de conexión: {pc.connectionState}")
-        if pc and pc.connectionState in ["failed", "closed"]:
+        if pc.connectionState in ["failed", "closed"]:
             await cleanup_webrtc()
 
     # Manejar la recepción de Data Channels (desde la App Android)
