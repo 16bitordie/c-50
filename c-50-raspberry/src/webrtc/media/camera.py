@@ -26,7 +26,10 @@ def create_video_track():
             # Usamos MediaPlayer directamente apuntando a /dev/video0
             player = MediaPlayer('/dev/video0', format='v4l2', options={
                 'video_size': config.VIDEO_RESOLUTION,
-                'framerate': str(config.VIDEO_FRAMERATE)
+                'framerate': str(config.VIDEO_FRAMERATE),
+                'fflags': 'nobuffer',
+                'flags': 'low_delay',
+                'avioflags': 'direct'
             })
             
             print("[Video] Track de cámara (v4l2) creado correctamente.")
