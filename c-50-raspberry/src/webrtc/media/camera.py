@@ -26,7 +26,7 @@ def create_video_track():
             player = MediaPlayer('/dev/video0', format='v4l2', options={        
                 'video_size': config.VIDEO_RESOLUTION,
                 'framerate': str(config.VIDEO_FRAMERATE), # Prueba a subir tu config.py a 24 o 30
-                'input_format': 'mjpeg', # <- ¡LA MAGIA ES ESTO!
+                'input_format': 'h264', # <- ¡LA MAGIA ES ESTO!
                 'fflags': 'nobuffer',
                 'flags': 'low_delay',
                 'avioflags': 'direct'
