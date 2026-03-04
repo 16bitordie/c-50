@@ -21,12 +21,12 @@ def create_video_track():
         elif os_name == "Linux":
             # En Raspberry Pi OS Bullseye (Legacy), v4l2 funciona nativamente
             # y es mucho más rápido que usar OpenCV.
-            print("[Video] Detectado Linux (Raspberry Pi Bullseye). Usando v4l2 nativo...")
+            print("[Video] Detectado Linux... Usando v4l2 nativo con MJPEG...")
             
-            # Usamos MediaPlayer directamente apuntando a /dev/video0
-            player = MediaPlayer('/dev/video0', format='v4l2', options={
+            player = MediaPlayer('/dev/video0', format='v4l2', options={        
                 'video_size': config.VIDEO_RESOLUTION,
-                'framerate': str(config.VIDEO_FRAMERATE),
+                'framerate': str(config.VIDEO_FRAMERATE), # Prueba a subir tu config.py a 24 o 30
+                'input_format': 'mjpeg', # <- ¡LA MAGIA ES ESTO!
                 'fflags': 'nobuffer',
                 'flags': 'low_delay',
                 'avioflags': 'direct'
