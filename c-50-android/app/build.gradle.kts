@@ -4,7 +4,7 @@ plugins {
 }
 
 android {
-    namespace = "com.i02bahip.c50brain"
+    namespace = "com.i02bahip.c50android"
     compileSdk {
         version = release(36) {
             minorApiLevel = 1
@@ -12,7 +12,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.i02bahip.c50brain"
+        applicationId = "com.i02bahip.c50android"
         minSdk = 24
         targetSdk = 36
         versionCode = 1
@@ -55,10 +55,20 @@ dependencies {
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     debugImplementation(libs.androidx.compose.ui.tooling)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
-    
-    // --- C-50 Brain Dependencias ---
+    // --- C-50 Dependencias ---
+
+    // WebRTC (Motor oficial para el video P2P)
     implementation(libs.libwebrtc.android)
+
+    // Socket.io (Para hablar con nuestro servidor de Node.js)
     implementation("io.socket:socket.io-client:2.1.0") {
-        exclude(group = "org.json", module = "json")
+        exclude(group = "org.json", module = "json") // Evitar conflictos con Android JSON
     }
+
+    // Coroutines (Para manejar asincronía limpiamente como en Python)
+    implementation(libs.kotlinx.coroutines.android)
+
+    // Gson (Para parsear y crear los datos SDP/ICE que enviaremos a la Raspberry)
+    implementation(libs.gson)
+    implementation(libs.socket.io.client)
 }
