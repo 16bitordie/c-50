@@ -2,10 +2,31 @@ package com.i02bahip.c50android
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.material3.Button
+import androidx.compose.material3.Text
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.unit.dp
 import androidx.compose.runtime.*
-import androidx.compose.ui.Modifier
+import androidx.compose.ui.Modifier 
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.background
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.geometry.Offset
+import kotlin.math.pow
+import kotlin.math.sqrt
+import kotlin.math.roundToInt
 import org.webrtc.EglBase
 import org.webrtc.SurfaceViewRenderer
 import org.webrtc.VideoTrack
@@ -55,11 +76,19 @@ class MainActivity : ComponentActivity() {
 
         // 4. Mostramos la interfaz de usuario
         setContent {
-            // Un Composable personalizado que envuelve el reproductor de WebRTC
-            C50VideoRenderer(
-                videoTrack = remoteVideoTrack,
-                eglBaseContext = eglBase.eglBaseContext
-            )
+            // Un Composable principal que envuelve el video y los controles
+            Box(modifier = Modifier.fillMaxSize()) {
+                C50VideoRenderer(
+                    videoTrack = remoteVideoTrack,
+                    eglBaseContext = eglBase.eglBaseContext
+                )
+                
+                // Controles superpuestos (Joystick a la izquierda)
+                AnalogJoystick(
+                    modifier = Modifier.align(Alignment.BottomStart).padding(32.dp),
+                    onCommand = { cmd -> webrtcManager.sendCommand(cmd) }
+                )
+            }
         }
     }
     override fun onDestroy() {
@@ -88,4 +117,58 @@ fun C50VideoRenderer(videoTrack: VideoTrack?, eglBaseContext: EglBase.Context) {
             videoTrack?.addSink(view)
         }
     )
+}
+
+@Composable
+fun AnalogJoystick(modifier: Modifier = Modifier, onCommand: (String) -> Unit) {
+    var offsetX by remember { mutableStateOf(0f) }
+    var offsetY by remember { mutableStateOf(0f) }
+    val maxRadius = 150f // Límite del joystick
+
+    Box(
+        modifier = modifier
+            .size(150.dp)
+            .background(Color.Gray.copy(alpha = 0.4f), CircleShape)
+            .pointerInput(Unit) {
+                detectDragGestures(
+                    onDragEnd = {
+                        // Vuelve al centro al soltar
+                        offsetX = 0f
+                        offsetY = 0f
+                        onCommand("JOY:0,0")
+                    }
+                ) { change, dragAmount ->
+                    change.consume()
+                    var newX = offsetX + dragAmount.x
+                    var newY = offsetY + dragAmount.y
+                    
+                    val distance = sqrt(newX.pow(2) + newY.pow(2))
+                    
+                    // Restringir el círculo interno para que no se salga de su base
+                    if (distance > maxRadius) {
+                        newX = (newX / distance) * maxRadius
+                        newY = (newY / distance) * maxRadius
+                    }
+                    
+                    offsetX = newX
+                    offsetY = newY
+
+                    // Convertir el desplazamiento a valores analógicos de -100 a +100
+                    // Invertimos el eje Y para que "hacia arriba" sea positivo
+                    val xPercent = (offsetX / maxRadius * 100).toInt()
+                    val yPercent = (-offsetY / maxRadius * 100).toInt()
+                    
+                    onCommand("JOY:$xPercent,$yPercent")
+                }
+            },
+        contentAlignment = Alignment.Center
+    ) {
+        // El "palo" del joystick (círculo interno)
+        Box(
+            modifier = Modifier
+                .offset { IntOffset(offsetX.roundToInt(), offsetY.roundToInt()) }
+                .size(60.dp)
+                .background(Color.DarkGray, CircleShape)
+        )
+    }
 }

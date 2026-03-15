@@ -31,6 +31,8 @@ class MainActivity : ComponentActivity() {
     private val eglBase = EglBase.create()
 
     private var localVideoTrack by mutableStateOf<VideoTrack?>(null)
+    private var connectionInfoText by mutableStateOf("Estado: Esperando piloto...")
+    private var lastCommandText by mutableStateOf("Comando: NINGUNO")
 
     private val requestPermissionsLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -47,7 +49,12 @@ class MainActivity : ComponentActivity() {
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
         setContent {
-            BrainScreen(videoTrack = localVideoTrack, eglBaseContext = eglBase.eglBaseContext)
+            BrainScreen(
+                videoTrack = localVideoTrack, 
+                eglBaseContext = eglBase.eglBaseContext,
+                connectionInfo = connectionInfoText,
+                lastCommand = lastCommandText
+            )
         }
 
         checkAndRequestPermissions()
@@ -84,6 +91,14 @@ class MainActivity : ComponentActivity() {
             localVideoTrack = track
         }
 
+        webrtcManager.onConnectionInfoChanged = { info ->
+            connectionInfoText = info
+        }
+
+        webrtcManager.onCommandReceived = { cmd ->
+            lastCommandText = "Instrucción Mando: $cmd"
+        }
+
         signalingClient.connect()
     }
 
@@ -96,7 +111,7 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun BrainScreen(videoTrack: VideoTrack?, eglBaseContext: EglBase.Context) {
+fun BrainScreen(videoTrack: VideoTrack?, eglBaseContext: EglBase.Context, connectionInfo: String, lastCommand: String) {
     Box(modifier = Modifier.fillMaxSize()) {
         if (videoTrack != null) {
             AndroidView(
@@ -124,15 +139,30 @@ fun BrainScreen(videoTrack: VideoTrack?, eglBaseContext: EglBase.Context) {
         }
         
         // Overlay de texto para saber que esta app es el Cerebro
-        Text(
-            text = "?? C-50 BRAIN ACTIVE",
-            color = Color.Green,
-            fontSize = 18.sp,
+        androidx.compose.foundation.layout.Column(
             modifier = Modifier
                 .align(Alignment.TopStart)
                 .padding(16.dp)
                 .background(Color.Black.copy(alpha = 0.5f))
                 .padding(8.dp)
-        )
+        ) {
+            Text(
+                text = "🤖 C-50 BRAIN ACTIVE",
+                color = Color.Green,
+                fontSize = 18.sp
+            )
+            androidx.compose.foundation.layout.Spacer(modifier = Modifier.padding(4.dp))
+            Text(
+                text = connectionInfo,
+                color = Color.Yellow,
+                fontSize = 14.sp
+            )
+            androidx.compose.foundation.layout.Spacer(modifier = Modifier.padding(4.dp))
+            Text(
+                text = lastCommand,
+                color = Color.Cyan,
+                fontSize = 18.sp
+            )
+        }
     }
 }

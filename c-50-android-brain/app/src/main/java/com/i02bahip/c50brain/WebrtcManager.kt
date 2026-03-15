@@ -23,19 +23,16 @@ class WebrtcManager(
 
     private val iceServers = listOf(
         PeerConnection.IceServer.builder("stun:stun.l.google.com:19302").createIceServer(),
-        // Servidor TURN gratuito de Metered para perforar el 4G:
-        PeerConnection.IceServer.builder("turn:openrelay.metered.ca:80")
-            .setUsername("openrelayproject")
-            .setPassword("openrelayproject")
-            .createIceServer(),
-        PeerConnection.IceServer.builder("turn:openrelay.metered.ca:443")
-            .setUsername("openrelayproject")
-            .setPassword("openrelayproject")
-            .createIceServer()
+        PeerConnection.IceServer.builder("turn:6a8tenisdemesa.com:3478").setUsername("c50_robot").setPassword("mypassword123C50").createIceServer(),
+        PeerConnection.IceServer.builder("turn:6a8tenisdemesa.com:3478?transport=tcp").setUsername("c50_robot").setPassword("mypassword123C50").createIceServer()
     )
 
     // Callback si quisieramos ver la camara localmente (opcional)
     var onLocalVideoTrackReady: ((VideoTrack) -> Unit)? = null
+    // Callback para enviar informacion a la UI
+    var onConnectionInfoChanged: ((String) -> Unit)? = null
+    // Callback para recibir comandos del cerebro
+    var onCommandReceived: ((String) -> Unit)? = null
 
     init {
         initWebRTC()
@@ -105,6 +102,7 @@ class WebrtcManager(
             sdpSemantics = PeerConnection.SdpSemantics.UNIFIED_PLAN
             tcpCandidatePolicy = PeerConnection.TcpCandidatePolicy.ENABLED
             continualGatheringPolicy = PeerConnection.ContinualGatheringPolicy.GATHER_CONTINUALLY
+            iceTransportsType = PeerConnection.IceTransportsType.ALL
         }
 
         peerConnection = peerConnectionFactory.createPeerConnection(rtcConfig, object : PeerConnection.Observer {
@@ -123,6 +121,37 @@ class WebrtcManager(
 
             override fun onIceConnectionChange(state: PeerConnection.IceConnectionState) {
                 Log.d(TAG, "Estado de conexion ICE: $state")
+                if (state == PeerConnection.IceConnectionState.CONNECTED || state == PeerConnection.IceConnectionState.COMPLETED) {
+                    peerConnection?.getStats { report ->
+                        var localType = "unknown"
+                        var remoteType = "unknown"
+                        var isRelay = false
+                        
+                        for ((id, rtcStat) in report.statsMap) {
+                            if (rtcStat.type == "candidate-pair" && rtcStat.members["state"] == "succeeded") {
+                                val localId = rtcStat.members["localCandidateId"] as? String
+                                val remoteId = rtcStat.members["remoteCandidateId"] as? String
+                                
+                                if (localId != null) {
+                                    localType = report.statsMap[localId]?.members?.get("candidateType") as? String ?: "unknown"
+                                }
+                                if (remoteId != null) {
+                                    remoteType = report.statsMap[remoteId]?.members?.get("candidateType") as? String ?: "unknown"
+                                }
+                                
+                                if (localType == "relay" || remoteType == "relay") {
+                                    isRelay = true
+                                }
+                                break
+                            }
+                        }
+                        
+                        val protocol = if (isRelay) "TURN (Seguro/4G)" else "STUN/Directo"
+                        onConnectionInfoChanged?.invoke("Estado: VÍDEO ACTIVO\nRed: $protocol\n-> L:$localType R:$remoteType")
+                    }
+                } else {
+                    onConnectionInfoChanged?.invoke("Estado ICE: $state")
+                }
             }
 
             override fun onSignalingChange(state: PeerConnection.SignalingState?) {}
@@ -131,7 +160,19 @@ class WebrtcManager(
             override fun onIceCandidatesRemoved(candidates: Array<out IceCandidate>?) {}
             override fun onAddStream(stream: MediaStream?) {}
             override fun onRemoveStream(stream: MediaStream?) {}
-            override fun onDataChannel(dataChannel: DataChannel?) {}
+            override fun onDataChannel(dataChannel: DataChannel?) {
+                dataChannel?.registerObserver(object: DataChannel.Observer {
+                    override fun onBufferedAmountChange(p0: Long) {}
+                    override fun onStateChange() {}
+                    override fun onMessage(buffer: DataChannel.Buffer) {
+                        val data = ByteArray(buffer.data.remaining())
+                        buffer.data.get(data)
+                        val command = String(data)
+                        onCommandReceived?.invoke(command)
+                        Log.d(TAG, "Mando dice: $command")
+                    }
+                })
+            }
             override fun onRenegotiationNeeded() {}
             override fun onTrack(transceiver: RtpTransceiver) {}
         })
@@ -185,8 +226,8 @@ class WebrtcManager(
             try {
                 val candidateObj = data.getJSONObject("candidate")
                 val sdp = candidateObj.getString("candidate")
-                val sdpMid = candidateObj.getString("sdpMid")
-                val sdpMLineIndex = candidateObj.getInt("sdpMLineIndex")
+                val sdpMid = if (candidateObj.has("sdpMid")) candidateObj.getString("sdpMid") else candidateObj.getString("id")
+                val sdpMLineIndex = if (candidateObj.has("sdpMLineIndex")) candidateObj.getInt("sdpMLineIndex") else candidateObj.getInt("label")
 
                 val iceCandidate = IceCandidate(sdpMid, sdpMLineIndex, sdp)
                 peerConnection?.addIceCandidate(iceCandidate)
@@ -213,4 +254,9 @@ open class SimpleSdpObserver : SdpObserver {
     override fun onCreateFailure(p0: String?) {}
     override fun onSetFailure(p0: String?) {}
 }
+
+
+
+
+
 

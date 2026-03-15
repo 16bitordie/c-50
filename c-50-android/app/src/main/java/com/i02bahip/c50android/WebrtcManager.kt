@@ -13,19 +13,13 @@ class WebrtcManager(
     // Componentes principales de WebRTC
     private lateinit var peerConnectionFactory: PeerConnectionFactory
     private var peerConnection: PeerConnection? = null
+    var dataChannel: DataChannel? = null
 
     // Configuración base (Servidores STUN/TURN de Google)
     private val iceServers = listOf(
         PeerConnection.IceServer.builder("stun:stun.l.google.com:19302").createIceServer(),
-        // Servidor TURN gratuito de Metered para perforar el 4G:
-        PeerConnection.IceServer.builder("turn:openrelay.metered.ca:80")
-            .setUsername("openrelayproject")
-            .setPassword("openrelayproject")
-            .createIceServer(),
-        PeerConnection.IceServer.builder("turn:openrelay.metered.ca:443")
-            .setUsername("openrelayproject")
-            .setPassword("openrelayproject")
-            .createIceServer()
+        PeerConnection.IceServer.builder("turn:6a8tenisdemesa.com:3478").setUsername("c50_robot").setPassword("mypassword123C50").createIceServer(),
+        PeerConnection.IceServer.builder("turn:6a8tenisdemesa.com:3478?transport=tcp").setUsername("c50_robot").setPassword("mypassword123C50").createIceServer()
     )
 
     // Callbacks para la Vista (UI)
@@ -62,8 +56,11 @@ class WebrtcManager(
     fun startCall() {
         createPeerConnection()
 
+        val dcInit = DataChannel.Init()
+        dataChannel = peerConnection?.createDataChannel("robot-control", dcInit)
+
         // Muy importante: Configurar transceptores ANTES de crear la oferta
-        // Le decimos a la Raspberry: "Queremos RECIBIR video, pero no te enviamos video"
+        // Le decimos al Cerebro: "Queremos RECIBIR video, pero no te enviamos video"
         peerConnection?.addTransceiver(
             MediaStreamTrack.MediaType.MEDIA_TYPE_VIDEO,
             RtpTransceiver.RtpTransceiverInit(RtpTransceiver.RtpTransceiverDirection.RECV_ONLY)
@@ -72,11 +69,22 @@ class WebrtcManager(
         createOffer()
     }
 
+    fun sendCommand(command: String) {
+        if (dataChannel?.state() == DataChannel.State.OPEN) {
+            val buffer = java.nio.ByteBuffer.wrap(command.toByteArray())
+            dataChannel?.send(DataChannel.Buffer(buffer, false))
+            Log.d(TAG, "Comando enviado: $command")
+        } else {
+            Log.e(TAG, "No se pudo enviar $command. El DataChannel no está abierto. Estado: ${dataChannel?.state()}")
+        }
+    }
+
     private fun createPeerConnection() {
         val rtcConfig = PeerConnection.RTCConfiguration(iceServers).apply {
             sdpSemantics = PeerConnection.SdpSemantics.UNIFIED_PLAN
             tcpCandidatePolicy = PeerConnection.TcpCandidatePolicy.ENABLED
             continualGatheringPolicy = PeerConnection.ContinualGatheringPolicy.GATHER_CONTINUALLY
+            iceTransportsType = PeerConnection.IceTransportsType.ALL
         }
 
         peerConnection = peerConnectionFactory.createPeerConnection(rtcConfig, object : PeerConnection.Observer {
@@ -85,7 +93,8 @@ class WebrtcManager(
                 val jsonCandidate = JSONObject().apply {
                     put("type", "candidate")
                     put("candidate", candidate.sdp)
-                    // Las claves en socket.io/aiortc suelen llamarse sdpMid y sdpMLineIndex
+                    put("sdpMid", candidate.sdpMid)
+                    put("sdpMLineIndex", candidate.sdpMLineIndex)
                     put("id", candidate.sdpMid)
                     put("label", candidate.sdpMLineIndex)
                 }
@@ -162,10 +171,10 @@ class WebrtcManager(
         signalingClient.onIceCandidateReceived = { data ->
             try {
                 val candidateObj = data.getJSONObject("candidate")
-                // Compatibilidad con la estructura que envía aiortc
+                // Compatibilidad con la estructura para que funcione siempre
                 val sdp = candidateObj.getString("candidate")
-                val sdpMid = candidateObj.getString("sdpMid")
-                val sdpMLineIndex = candidateObj.getInt("sdpMLineIndex")
+                val sdpMid = if (candidateObj.has("sdpMid")) candidateObj.getString("sdpMid") else candidateObj.getString("id")
+                val sdpMLineIndex = if (candidateObj.has("sdpMLineIndex")) candidateObj.getInt("sdpMLineIndex") else candidateObj.getInt("label")
 
                 val iceCandidate = IceCandidate(sdpMid, sdpMLineIndex, sdp)
                 peerConnection?.addIceCandidate(iceCandidate)
@@ -189,3 +198,6 @@ open class SimpleSdpObserver : SdpObserver {
     override fun onCreateFailure(p0: String?) {}
     override fun onSetFailure(p0: String?) {}
 }
+
+
+
