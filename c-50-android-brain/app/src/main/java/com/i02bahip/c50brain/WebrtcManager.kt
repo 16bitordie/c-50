@@ -4,6 +4,9 @@ import android.content.Context
 import android.util.Log
 import org.json.JSONObject
 import org.webrtc.*
+import android.media.AudioManager
+import android.media.AudioDeviceInfo
+import android.os.Build
 
 class WebrtcManager(
     private val context: Context,
@@ -20,6 +23,9 @@ class WebrtcManager(
     private var localVideoSource: VideoSource? = null
     private var localVideoTrack: VideoTrack? = null
     private var surfaceTextureHelper: SurfaceTextureHelper? = null
+    // Captura de audio
+    private var localAudioSource: AudioSource? = null
+    private var localAudioTrack: AudioTrack? = null
 
     private val iceServers = listOf(
         PeerConnection.IceServer.builder("stun:stun.l.google.com:19302").createIceServer(),
@@ -39,7 +45,25 @@ class WebrtcManager(
         setupSignalingListeners()
     }
 
+        private fun setupAudioManager() {
+        val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+        audioManager.mode = AudioManager.MODE_IN_COMMUNICATION
+        
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            val speakerDevice = audioManager.availableCommunicationDevices.firstOrNull { 
+                it.type == AudioDeviceInfo.TYPE_BUILTIN_SPEAKER 
+            }
+            if (speakerDevice != null) {
+                audioManager.setCommunicationDevice(speakerDevice)
+            }
+        } else {
+            @Suppress("DEPRECATION")
+            audioManager.isSpeakerphoneOn = true
+        }
+    }
+
     private fun initWebRTC() {
+        setupAudioManager()
         Log.d(TAG, "Inicializando motor WebRTC en modo Cerebro...")
 
         val initOptions = PeerConnectionFactory.InitializationOptions.builder(context)
@@ -59,7 +83,21 @@ class WebrtcManager(
             .createPeerConnectionFactory()
             
         Log.d(TAG, "WebRTC inicializado correctamente.")
+        createLocalAudioTrack()
         createLocalVideoTrack()
+    }
+
+        private fun createLocalAudioTrack() {
+        Log.d(TAG, "Configurando captura de audio...")
+        val audioConstraints = MediaConstraints()
+        audioConstraints.mandatory.add(MediaConstraints.KeyValuePair("googEchoCancellation", "true"))
+        audioConstraints.mandatory.add(MediaConstraints.KeyValuePair("googAutoGainControl", "true"))
+        audioConstraints.mandatory.add(MediaConstraints.KeyValuePair("googHighpassFilter", "true"))
+        audioConstraints.mandatory.add(MediaConstraints.KeyValuePair("googNoiseSuppression", "true"))
+
+        localAudioSource = peerConnectionFactory.createAudioSource(audioConstraints)
+        localAudioTrack = peerConnectionFactory.createAudioTrack("101", localAudioSource)
+        Log.d(TAG, "Track de audio local creado con exito.")
     }
 
     private fun createLocalVideoTrack() {
@@ -181,6 +219,11 @@ class WebrtcManager(
             peerConnection?.addTrack(localVideoTrack, listOf("stream1"))
             Log.d(TAG, "Track de video local inyectado al PeerConnection")
         }
+
+        if (localAudioTrack != null) {
+            peerConnection?.addTrack(localAudioTrack, listOf("stream1"))
+            Log.d(TAG, "Track de audio local inyectado al PeerConnection")
+        }
     }
 
     private fun setupSignalingListeners() {
@@ -196,6 +239,10 @@ class WebrtcManager(
                 val sessionDescription = SessionDescription(SessionDescription.Type.OFFER, sdpString)
 
                 peerConnection?.setRemoteDescription(SimpleSdpObserver(), sessionDescription)
+
+                val answerConstraints = MediaConstraints().apply {
+                    mandatory.add(MediaConstraints.KeyValuePair("OfferToReceiveAudio", "true"))
+                }
 
                 peerConnection?.createAnswer(object : SdpObserver {
                     override fun onCreateSuccess(sessionDescription: SessionDescription) {
@@ -216,7 +263,7 @@ class WebrtcManager(
                     override fun onSetSuccess() {}
                     override fun onCreateFailure(reason: String?) { Log.e(TAG, "Fallo al crear answer: $reason") }
                     override fun onSetFailure(reason: String?) {}
-                }, MediaConstraints())
+                }, answerConstraints)
             } catch (e: Exception) {
                 Log.e(TAG, "Error procesando Offer: ${e.message}")
             }

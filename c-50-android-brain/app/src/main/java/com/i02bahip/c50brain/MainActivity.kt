@@ -38,7 +38,8 @@ class MainActivity : ComponentActivity() {
         ActivityResultContracts.RequestMultiplePermissions()
     ) { permissions ->
         val cameraGranted = permissions[Manifest.permission.CAMERA] == true
-        if (cameraGranted) {
+        val audioGranted = permissions[Manifest.permission.RECORD_AUDIO] == true
+        if (cameraGranted && audioGranted) {
             startRobotBrain()
         }
     }
@@ -64,6 +65,9 @@ class MainActivity : ComponentActivity() {
         val permissionsToRequest = mutableListOf<String>()
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
             permissionsToRequest.add(Manifest.permission.CAMERA)
+        }
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+            permissionsToRequest.add(Manifest.permission.RECORD_AUDIO)
         }
         // Puedes anadir permisos de bluetooth aqui luego
         // si no los tienes.
@@ -166,3 +170,4 @@ fun BrainScreen(videoTrack: VideoTrack?, eglBaseContext: EglBase.Context, connec
         }
     }
 }
+

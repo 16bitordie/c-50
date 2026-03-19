@@ -1,4 +1,8 @@
 package com.i02bahip.c50android
+import android.Manifest
+import android.content.pm.PackageManager
+import androidx.core.content.ContextCompat
+import androidx.activity.result.contract.ActivityResultContracts
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -17,6 +21,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier 
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.background
@@ -24,6 +29,13 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.material3.Icon
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Warning // Test with something known
+import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.MicOff
 import kotlin.math.pow
 import kotlin.math.sqrt
 import kotlin.math.roundToInt
@@ -32,6 +44,28 @@ import org.webrtc.SurfaceViewRenderer
 import org.webrtc.VideoTrack
 
 class MainActivity : ComponentActivity() {
+
+    private val requestPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { permissions ->
+        val audioGranted = permissions[Manifest.permission.RECORD_AUDIO] == true
+        if (audioGranted) {
+            initApp()
+        }
+    }
+
+    private fun checkAndRequestPermissions() {
+        val permissionsToRequest = mutableListOf<String>()
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+            permissionsToRequest.add(Manifest.permission.RECORD_AUDIO)
+        }
+        if (permissionsToRequest.isNotEmpty()) {
+            requestPermissionLauncher.launch(permissionsToRequest.toTypedArray())
+        } else {
+            initApp()
+        }
+    }
+
 
     // Instancias de nuestros gestores de conexión
     private lateinit var signalingClient: SignalingClient
@@ -47,6 +81,10 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         
+        checkAndRequestPermissions()
+    }
+
+    private fun initApp() {
         // Mantener la pantalla siempre encendida mientras la app esté abierta
         window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
@@ -87,6 +125,14 @@ class MainActivity : ComponentActivity() {
                 AnalogJoystick(
                     modifier = Modifier.align(Alignment.BottomStart).padding(32.dp),
                     onCommand = { cmd -> webrtcManager.sendCommand(cmd) }
+                )
+                
+                // Botón Push-To-Talk (PTT) a la derecha
+                PushToTalkButton(
+                    modifier = Modifier.align(Alignment.BottomEnd).padding(32.dp),
+                    onStateChange = { isTalking ->
+                        webrtcManager.setMicrophoneEnabled(isTalking)
+                    }
                 )
             }
         }
@@ -169,6 +215,39 @@ fun AnalogJoystick(modifier: Modifier = Modifier, onCommand: (String) -> Unit) {
                 .offset { IntOffset(offsetX.roundToInt(), offsetY.roundToInt()) }
                 .size(60.dp)
                 .background(Color.DarkGray, CircleShape)
+        )
+    }
+}
+
+@Composable
+fun PushToTalkButton(modifier: Modifier = Modifier, onStateChange: (Boolean) -> Unit) {
+    var isPressed by remember { mutableStateOf(false) }
+
+    Box(
+        modifier = modifier
+            .size(100.dp)
+            .background(
+                if (isPressed) Color.Green.copy(alpha = 0.6f) else Color.Gray.copy(alpha = 0.4f),
+                CircleShape
+            )
+            .pointerInput(Unit) {
+                detectTapGestures(
+                    onPress = {
+                        isPressed = true
+                        onStateChange(true)
+                        tryAwaitRelease()
+                        isPressed = false
+                        onStateChange(false)
+                    }
+                )
+            },
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(
+            imageVector = if (isPressed) Icons.Default.Mic else Icons.Default.MicOff,
+            contentDescription = if (isPressed) "Hablando" else "Pulsa para hablar",
+            tint = Color.White,
+            modifier = Modifier.size(48.dp)
         )
     }
 }

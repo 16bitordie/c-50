@@ -3,6 +3,9 @@ import android.content.Context
 import android.util.Log
 import org.json.JSONObject
 import org.webrtc.*
+import android.media.AudioManager
+import android.media.AudioDeviceInfo
+import android.os.Build
 
 class WebrtcManager(
     private val context: Context,
@@ -13,6 +16,9 @@ class WebrtcManager(
     // Componentes principales de WebRTC
     private lateinit var peerConnectionFactory: PeerConnectionFactory
     private var peerConnection: PeerConnection? = null
+    // Captura de audio
+    private var localAudioSource: AudioSource? = null
+    private var localAudioTrack: AudioTrack? = null
     var dataChannel: DataChannel? = null
 
     // Configuración base (Servidores STUN/TURN de Google)
@@ -30,7 +36,25 @@ class WebrtcManager(
         setupSignalingListeners()
     }
 
+        private fun setupAudioManager() {
+        val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+        audioManager.mode = AudioManager.MODE_IN_COMMUNICATION
+        
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            val speakerDevice = audioManager.availableCommunicationDevices.firstOrNull { 
+                it.type == AudioDeviceInfo.TYPE_BUILTIN_SPEAKER 
+            }
+            if (speakerDevice != null) {
+                audioManager.setCommunicationDevice(speakerDevice)
+            }
+        } else {
+            @Suppress("DEPRECATION")
+            audioManager.isSpeakerphoneOn = true
+        }
+    }
+
     private fun initWebRTC() {
+        setupAudioManager()
         Log.d(TAG, "Inicializando motor WebRTC...")
 
         // 1. Inicializar el entorno global de WebRTC para Android
@@ -50,6 +74,7 @@ class WebrtcManager(
             .setVideoDecoderFactory(defaultVideoDecoderFactory)
             .createPeerConnectionFactory()
 
+        createLocalAudioTrack()
         Log.d(TAG, "WebRTC inicializado correctamente.")
     }
 
@@ -77,6 +102,25 @@ class WebrtcManager(
         } else {
             Log.e(TAG, "No se pudo enviar $command. El DataChannel no está abierto. Estado: ${dataChannel?.state()}")
         }
+    }
+
+        private fun createLocalAudioTrack() {
+        Log.d(TAG, "Configurando captura de audio de Piloto...")
+        val audioConstraints = MediaConstraints()
+        audioConstraints.mandatory.add(MediaConstraints.KeyValuePair("googEchoCancellation", "true"))
+        audioConstraints.mandatory.add(MediaConstraints.KeyValuePair("googAutoGainControl", "true"))
+        audioConstraints.mandatory.add(MediaConstraints.KeyValuePair("googHighpassFilter", "true"))
+        audioConstraints.mandatory.add(MediaConstraints.KeyValuePair("googNoiseSuppression", "true"))
+
+        localAudioSource = peerConnectionFactory.createAudioSource(audioConstraints)
+        localAudioTrack = peerConnectionFactory.createAudioTrack("101", localAudioSource)
+        localAudioTrack?.setEnabled(false) // Por defecto silenciado (PTT)
+        Log.d(TAG, "Track de audio piloto creado con exito.")
+    }
+
+    fun setMicrophoneEnabled(enabled: Boolean) {
+        localAudioTrack?.setEnabled(enabled)
+        Log.d(TAG, "Micrófono habilitado: $enabled")
     }
 
     private fun createPeerConnection() {
@@ -123,12 +167,15 @@ class WebrtcManager(
             override fun onDataChannel(dataChannel: DataChannel?) {}
             override fun onRenegotiationNeeded() {}
         })
+        if (localAudioTrack != null) {
+            peerConnection?.addTrack(localAudioTrack, listOf("stream1"))
+        }
     }
 
     private fun createOffer() {
         val mediaConstraints = MediaConstraints().apply {
             mandatory.add(MediaConstraints.KeyValuePair("OfferToReceiveVideo", "true"))
-            mandatory.add(MediaConstraints.KeyValuePair("OfferToReceiveAudio", "false"))
+            mandatory.add(MediaConstraints.KeyValuePair("OfferToReceiveAudio", "true"))
         }
 
         peerConnection?.createOffer(object : SdpObserver {
@@ -198,6 +245,7 @@ open class SimpleSdpObserver : SdpObserver {
     override fun onCreateFailure(p0: String?) {}
     override fun onSetFailure(p0: String?) {}
 }
+
 
 
 
